@@ -58,28 +58,47 @@ def create_random_population(ev_ctx):
 def select(pop, fits, ev_ctx):
     return random.choices(pop, weights=fits, k=ev_ctx["POP_SIZE"])
 
-def crossover(pop, ev_ctx):
-    return pop
-
-    off = []
-    for p1, p2 in zip(pop[::2], pop[1::2]):
-        if random.random() < 0.8:
-            point = random.randrange(0, IND_LEN)
-            o1 = p1[:point] + p2[point:]
-            o2 = p2[:point] + p1[point:]
-            off.append(o1)
-            off.append(o2)
-        else:
-            off.append(p1[:])
-            off.append(p2[:])
-    return off
-
 
 def deep_copy_population(pop):
     off = []
     for p in pop:
         off.append(p.copy())
     return off
+
+def merge_two_ind(ind1, ind2, ev_ctx):
+    ind_new = []
+    taken = [False for _ in range(ev_ctx["n"])]
+
+    for idx in ind1:
+        ind_new.append(idx)
+        taken[idx] = True
+    
+    for idx in ind2:
+        if not taken[idx]:
+            ind_new.append(idx)
+    return ind_new
+
+def crossover(pop, ev_ctx):
+
+    off = []
+    for p1, p2 in zip(pop[::2], pop[1::2]):
+        if random.random() < ev_ctx["CX_PROB"]:
+            #point = random.randrange(0, IND_LEN)
+            point_1 = len(p1)//2
+            point_2 = len(p2)//2
+
+
+
+            o1 = merge_two_ind(p1[:point_1], p2[point_2:], ev_ctx)
+            o2 = merge_two_ind(p2[:point_2], p1[point_1:], ev_ctx)
+            off.append(o1)
+            off.append(o2)
+        else:
+            off.append(p1.copy())
+            off.append(p2.copy())
+    return off
+
+
 
 def mutation_add_element(off, ev_ctx):
     for i in range(len(off)):
@@ -165,11 +184,11 @@ def evolutionary_algorithm(W, list_price_weight):
         "MAX_GEN": 100,
         "POP_SIZE": 10,
         "CX_PROB": 0.8,
-        "MUT_DEL_PROB": 0.99,
+        "MUT_DEL_PROB": 0.8,
         "MUT_DEL_ELEMENT_PROB": lambda ind_size: 1/ind_size,
-        "MUT_ADD_PROB": 0.99,
+        "MUT_ADD_PROB": 0.8,
         "MUT_ADD_ELEMENT_PROB": lambda elements_to_add_size: 1/elements_to_add_size,
-        "RANDOM_CREATION_STOP_ITERATION_PROB": 0.8,
+        "RANDOM_CREATION_STOP_ITERATION_PROB": 0.0,
         "W": W,
         "list_price_weight": list_price_weight,
         "n": len(list_price_weight),
@@ -196,6 +215,6 @@ def main(args):
 if __name__ == "__main__":
     random.seed(2137)
     parser = argparse.ArgumentParser()
-    parser.add_argument("--file", default="test_data/debug_10.txt", type=str, help="Test data to load.")
+    parser.add_argument("--file", default="test_data/input_1000.txt", type=str, help="Test data to load.")
 
     main(parser.parse_args())
