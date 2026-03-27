@@ -47,6 +47,8 @@ def create_random_population(ev_ctx):
             if weight_plus <= ev_ctx["W"]:
                 ind.append(idx)
                 ind_total_weight = weight_plus
+                if random.random() < ev_ctx["RANDOM_CREATION_STOP_ITERATION_PROB"]:
+                    break
             else:
                 break
 
@@ -56,7 +58,7 @@ def create_random_population(ev_ctx):
 def select(pop, fits, ev_ctx):
     return random.choices(pop, weights=fits, k=ev_ctx["POP_SIZE"])
 
-def crossover(pop):
+def crossover(pop, ev_ctx):
     return pop
 
     off = []
@@ -72,16 +74,73 @@ def crossover(pop):
             off.append(p2[:])
     return off
 
-def mutation(pop):
-    return pop
 
+def deep_copy_population(pop):
     off = []
     for p in pop:
-        if random.random() < MUT_PROB:
-            o = [1-i if random.random() < MUT_FLIP_PROB else i for i in p]
-            off.append(o)
-        else:
-            off.append(p[:])
+        off.append(p.copy())
+    return off
+
+def mutation_add_element(off, ev_ctx):
+    for i in range(len(off)):
+        if random.random() >= ev_ctx["MUT_ADD_PROB"]:
+            break
+    
+        ind = off[i]
+        ind_len = len(ind)
+
+        taken = [False for _ in range(ev_ctx["n"])]
+        elements_to_add_size = ev_ctx["n"]
+        for idx in ind:
+            taken[idx] = True
+            elements_to_add_size -= 1
+
+        if elements_to_add_size == 0:
+            continue
+
+        total_ind_weight = 0
+        for idx in ind:
+            total_ind_weight += ev_ctx["list_price_weight"][idx][1]
+        
+        add_elem_prob = ev_ctx["MUT_ADD_ELEMENT_PROB"](elements_to_add_size)
+        for idx in range(ev_ctx["n"]):
+            if taken[idx]:
+                continue
+
+            if random.random() >= add_elem_prob:
+                weight_plus = ev_ctx["list_price_weight"][idx][1] + total_ind_weight
+                if weight_plus <= ev_ctx["W"]:
+                    ind.append(idx)
+                    total_ind_weight = weight_plus
+    
+    return off
+
+def mutation_del_element(off, ev_ctx):
+    for i in range(len(off)):
+        if random.random() >= ev_ctx["MUT_DEL_PROB"]:
+            break
+    
+        ind = off[i]
+        ind_len = len(ind)
+        if ind_len == 0:
+            continue
+
+        new_ind = []
+        del_elem_prob = ev_ctx["MUT_DEL_ELEMENT_PROB"](ind_len)
+        for idx in ind:
+            if random.random() >= del_elem_prob:
+                new_ind.append(idx)
+            
+        off[i] = new_ind
+    
+    return off
+    
+
+def mutation(off, ev_ctx):
+
+    off = mutation_del_element(off, ev_ctx)
+    off = mutation_add_element(off, ev_ctx)
+
     return off
 
 def evolution(ev_ctx):
@@ -90,21 +149,27 @@ def evolution(ev_ctx):
     for gen in range(ev_ctx["MAX_GEN"]):
         fits = [fitness(ind, ev_ctx) for ind in pop]
         log.append(max(fits))
-        mating_pool = select(pop, fits, ev_ctx)
-        off = crossover(mating_pool)
-        off = mutation(off)
+
+        off = deep_copy_population(pop)
+        off = select(off, fits, ev_ctx)
+        off = crossover(off, ev_ctx)
+        off = mutation(off, ev_ctx)
+        
         off[0] = max(pop, key=lambda x: fitness(x, ev_ctx))
         pop = off[:]
     
     return pop, log
 
 def evolutionary_algorithm(W, list_price_weight):
-    ev_ctx = { # evoulionary context
-        "MAX_GEN": 1000,
-        "POP_SIZE": 50,
-        "IND_LEN": 50,
+    ev_ctx = { # evolutionary context
+        "MAX_GEN": 100,
+        "POP_SIZE": 10,
         "CX_PROB": 0.8,
-        "MUT_PROB": 0.6,
+        "MUT_DEL_PROB": 0.99,
+        "MUT_DEL_ELEMENT_PROB": lambda ind_size: 1/ind_size,
+        "MUT_ADD_PROB": 0.99,
+        "MUT_ADD_ELEMENT_PROB": lambda elements_to_add_size: 1/elements_to_add_size,
+        "RANDOM_CREATION_STOP_ITERATION_PROB": 0.8,
         "W": W,
         "list_price_weight": list_price_weight,
         "n": len(list_price_weight),
