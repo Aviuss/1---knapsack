@@ -47,17 +47,25 @@ def create_random_population(ev_ctx):
             if weight_plus <= ev_ctx["W"]:
                 ind.append(idx)
                 ind_total_weight = weight_plus
-                if random.random() < ev_ctx["RANDOM_CREATION_STOP_ITERATION_PROB"]:
-                    break
             else:
                 break
 
         pop.append(ind)
     return pop
 
-def select(pop, fits, ev_ctx):
+def tournament_select(pop, fits, ev_ctx, k=5):
+    selected = []
+    for _ in range(ev_ctx["POP_SIZE"]):
+        contestants = random.sample(range(ev_ctx["POP_SIZE"]), k)
+        winner = max(contestants, key=lambda i: fits[i])
+        selected.append(pop[winner].copy())
+    return selected
+
+def roulette_wheel_select(pop, fits, ev_ctx):
     return random.choices(pop, weights=fits, k=ev_ctx["POP_SIZE"])
 
+def select(pop, fits, ev_ctx):
+    return tournament_select(pop, fits, ev_ctx)
 
 def deep_copy_population(pop):
     off = []
@@ -79,15 +87,15 @@ def merge_two_ind(ind1, ind2, ev_ctx):
     return ind_new
 
 def crossover(pop, ev_ctx):
-
     off = []
     for p1, p2 in zip(pop[::2], pop[1::2]):
         if random.random() < ev_ctx["CX_PROB"]:
-            #point = random.randrange(0, IND_LEN)
             point_1 = len(p1)//2
             point_2 = len(p2)//2
-
-
+            #random.shuffle(p1)
+            #random.shuffle(p2)
+            p1.sort()
+            p2.sort()
 
             o1 = merge_two_ind(p1[:point_1], p2[point_2:], ev_ctx)
             o2 = merge_two_ind(p2[:point_2], p1[point_1:], ev_ctx)
@@ -98,16 +106,16 @@ def crossover(pop, ev_ctx):
             off.append(p2.copy())
     return off
 
-
-
-def mutation_add_element(off, ev_ctx):
+def mutation_add_element(off, off_total_weight, ev_ctx):
     for i in range(len(off)):
-        if random.random() >= ev_ctx["MUT_ADD_PROB"]:
-            break
-    
         ind = off[i]
         ind_len = len(ind)
-
+        if ind_len == ev_ctx["n"]:
+            continue
+        if random.random() >= ev_ctx["MUT_ADD_PROB"]:
+            continue
+    
+        
         taken = [False for _ in range(ev_ctx["n"])]
         elements_to_add_size = ev_ctx["n"]
         for idx in ind:
@@ -117,48 +125,69 @@ def mutation_add_element(off, ev_ctx):
         if elements_to_add_size == 0:
             continue
 
-        total_ind_weight = 0
-        for idx in ind:
-            total_ind_weight += ev_ctx["list_price_weight"][idx][1]
         
         add_elem_prob = ev_ctx["MUT_ADD_ELEMENT_PROB"](elements_to_add_size)
-        for idx in range(ev_ctx["n"]):
-            if taken[idx]:
-                continue
+        at_lest_once = True
+        nothing_added = True
 
-            if random.random() >= add_elem_prob:
-                weight_plus = ev_ctx["list_price_weight"][idx][1] + total_ind_weight
+        while at_lest_once or (off_total_weight[i] < ev_ctx["W"] and not nothing_added):
+            at_lest_once = False
+            nothing_added = True
+
+            for idx in range(ev_ctx["n"]):
+                if taken[idx]:
+                    continue
+                taken[idx] = True
+
+                if random.random() < add_elem_prob:
+                    continue
+                weight_plus = ev_ctx["list_price_weight"][idx][1] + off_total_weight[i]
                 if weight_plus <= ev_ctx["W"]:
                     ind.append(idx)
-                    total_ind_weight = weight_plus
+                    off_total_weight[i] = weight_plus
+                    nothing_added = False
     
     return off
 
-def mutation_del_element(off, ev_ctx):
+def mutation_del_element(off, off_total_weight, ev_ctx):
     for i in range(len(off)):
         if random.random() >= ev_ctx["MUT_DEL_PROB"]:
-            break
+            continue
     
         ind = off[i]
         ind_len = len(ind)
         if ind_len == 0:
             continue
 
-        new_ind = []
+        
         del_elem_prob = ev_ctx["MUT_DEL_ELEMENT_PROB"](ind_len)
-        for idx in ind:
-            if random.random() >= del_elem_prob:
-                new_ind.append(idx)
-            
+        at_lest_once = True
+
+        while at_lest_once or off_total_weight[i] > ev_ctx["W"]:
+            new_ind = []
+            at_lest_once = False
+            for idx in ind:
+                if random.random() >= del_elem_prob:
+                    new_ind.append(idx)
+                else:
+                    off_total_weight[i] -= ev_ctx["list_price_weight"][idx][1]
+            ind = new_ind
+
         off[i] = new_ind
     
     return off
     
 
 def mutation(off, ev_ctx):
+    off_total_weight = []
+    for ind in off:
+        total_ind_weight = 0
+        for idx in ind:
+            total_ind_weight += ev_ctx["list_price_weight"][idx][1]
+        off_total_weight.append(total_ind_weight)
 
-    off = mutation_del_element(off, ev_ctx)
-    off = mutation_add_element(off, ev_ctx)
+    off = mutation_del_element(off, off_total_weight, ev_ctx)
+    off = mutation_add_element(off, off_total_weight, ev_ctx)
 
     return off
 
@@ -174,21 +203,23 @@ def evolution(ev_ctx):
         off = crossover(off, ev_ctx)
         off = mutation(off, ev_ctx)
         
-        off[0] = max(pop, key=lambda x: fitness(x, ev_ctx))
-        pop = off[:]
-    
+        #off[0] = max(pop, key=lambda x: fitness(x, ev_ctx))
+        #pop = off[:]
+        pop.extend(off)
+        pop.sort(key=lambda x: fitness(x, ev_ctx), reverse=True)
+        pop = pop[0:ev_ctx["POP_SIZE"]]
+
     return pop, log
 
 def evolutionary_algorithm(W, list_price_weight):
     ev_ctx = { # evolutionary context
-        "MAX_GEN": 100,
-        "POP_SIZE": 10,
+        "MAX_GEN": 1000,
+        "POP_SIZE": 50,
         "CX_PROB": 0.8,
         "MUT_DEL_PROB": 0.8,
         "MUT_DEL_ELEMENT_PROB": lambda ind_size: 1/ind_size,
         "MUT_ADD_PROB": 0.8,
         "MUT_ADD_ELEMENT_PROB": lambda elements_to_add_size: 1/elements_to_add_size,
-        "RANDOM_CREATION_STOP_ITERATION_PROB": 0.0,
         "W": W,
         "list_price_weight": list_price_weight,
         "n": len(list_price_weight),
@@ -213,7 +244,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    random.seed(2137)
+    #random.seed(2137)
     parser = argparse.ArgumentParser()
     parser.add_argument("--file", default="test_data/input_1000.txt", type=str, help="Test data to load.")
 
