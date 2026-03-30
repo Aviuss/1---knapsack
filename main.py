@@ -1,5 +1,9 @@
 import argparse
 import random
+import matplotlib.pyplot as plt
+import matplotlib.collections as mc
+from matplotlib.lines import Line2D
+import numpy as np
 
 def read_data_from_file(filepath):
     file = open(filepath, 'r')
@@ -157,8 +161,8 @@ def mutation_del_element(off, off_total_weight, ev_ctx):
         if ind_len == 0:
             continue
 
-        
-        del_elem_prob = ev_ctx["MUT_DEL_ELEMENT_PROB"](ind_len)
+
+        del_elem_prob = ev_ctx["MUT_DEL_ELEMENT_PROB"](ind_len, ev_ctx)
         at_lest_once = True
 
         while at_lest_once or off_total_weight[i] > ev_ctx["W"]:
@@ -190,19 +194,24 @@ def mutation(off, ev_ctx):
     return off
 
 def evolution(ev_ctx):
-    log = []
+    max_log = []
+    flat_log = []
     pop = create_random_population(ev_ctx)
     for gen in range(ev_ctx["MAX_GEN"]):
         fits = [fitness(ind, ev_ctx) for ind in pop]
-        log.append(max(fits))
+        max_log.append(max(fits))
+        
+        ev_ctx['current_variable_is_function_flat'] = False
+        if len(max_log) >= ev_ctx["IS_FLAT_WINDOW"]:
+            if max_log[len(max_log)-1] == max_log[len(max_log) - ev_ctx["IS_FLAT_WINDOW"] - 1]:
+                ev_ctx['current_variable_is_function_flat'] = True
+        flat_log.append(ev_ctx['current_variable_is_function_flat'])
 
         off = deep_copy_population(pop)
         off = select(off, fits, ev_ctx)
         off = crossover(off, ev_ctx)
         off = mutation(off, ev_ctx)
         
-        #off[0] = max(pop, key=lambda x: fitness(x, ev_ctx))
-        #pop = off[:]
         pop.sort(key=lambda x: fitness(x, ev_ctx), reverse=True)
         pop = pop[0:int(ev_ctx["POP_SIZE"]*ev_ctx["PERCT_OF_PARENTS_INTO_NEXT_POPULATION"])]
         
@@ -210,29 +219,52 @@ def evolution(ev_ctx):
         pop.sort(key=lambda x: fitness(x, ev_ctx), reverse=True)
         pop = pop[0:ev_ctx["POP_SIZE"]]
 
-    return pop, log
+    return pop, max_log, flat_log
 
 def evolutionary_algorithm(W, list_price_weight):
+    
+    def mut_del_elem_prob_func(ind_size, ev_ctx):
+        if ev_ctx['current_variable_is_function_flat']:
+            return 7/ind_size
+        return 1/ind_size
+
     ev_ctx = { # evolutionary context
-        "MAX_GEN": 100,
-        "POP_SIZE": 100,
-        "CX_PROB": 0.99,
-        "MUT_DEL_PROB": 0.99,
-        "MUT_DEL_ELEMENT_PROB": lambda ind_size: 1/ind_size,
-        "MUT_ADD_PROB": 0.99,
-        "MUT_ADD_ELEMENT_PROB": lambda elements_to_add_size: 1/elements_to_add_size,
-        "PERCT_OF_PARENTS_INTO_NEXT_POPULATION": 0.05,
+        "MAX_GEN": 400,
+        "POP_SIZE": 60,
+        "CX_PROB": 0.90,
+        "MUT_DEL_PROB": 0.95,
+        "MUT_DEL_ELEMENT_PROB": mut_del_elem_prob_func,
+        "PERCT_OF_PARENTS_INTO_NEXT_POPULATION": 0.1,
         "W": W,
         "list_price_weight": list_price_weight,
         "n": len(list_price_weight),
+        "IS_FLAT_WINDOW": 10,
+        "current_variable_is_function_flat": False
     }
 
-    pop, log = evolution(ev_ctx)
-    print(max(pop, key=lambda x: fitness(x, ev_ctx)))
-    print(log)
 
-    import matplotlib.pyplot as plt
-    plt.plot(log)
+    pop, max_log, flat_log = evolution(ev_ctx)
+    print(max(pop, key=lambda x: fitness(x, ev_ctx)))
+    print(max_log)
+
+    fig, ax = plt.subplots()
+
+    x = np.arange(len(max_log))
+    y = np.array(max_log)
+    flags = np.array(flat_log, dtype=bool)
+
+    for i in range(len(x) - 1):
+        color = 'red' if flags[i] else 'steelblue'
+        ax.plot(x[i:i+2], y[i:i+2], color=color, linewidth=1.5)
+
+    legend_elements = [
+        Line2D([0], [0], color='steelblue', label='evolving'),
+        Line2D([0], [0], color='red',       label='flat (stagnant)'),
+    ]
+    ax.legend(handles=legend_elements)
+    ax.set_xlabel('Generation')
+    ax.set_ylabel('Max fitness')
+    plt.tight_layout()
     plt.show()
 
 
