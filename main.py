@@ -39,13 +39,13 @@ def create_random_population(ev_ctx):
     idx_list = list(range(ev_ctx["n"]))
     for _ in range(ev_ctx["POP_SIZE"]):
         random.shuffle(idx_list)
-        ind = []
+        ind = set([])
         ind_total_weight = 0
         
         for idx in idx_list:
             weight_plus = ev_ctx["list_price_weight"][idx][1] + ind_total_weight
             if weight_plus <= ev_ctx["W"]:
-                ind.append(idx)
+                ind.add(idx)
                 ind_total_weight = weight_plus
             else:
                 break
@@ -53,7 +53,7 @@ def create_random_population(ev_ctx):
         pop.append(ind)
     return pop
 
-def tournament_select(pop, fits, ev_ctx, k=5):
+def tournament_select(pop, fits, ev_ctx, k=3):
     selected = []
     for _ in range(ev_ctx["POP_SIZE"]):
         contestants = random.sample(range(ev_ctx["POP_SIZE"]), k)
@@ -74,16 +74,14 @@ def deep_copy_population(pop):
     return off
 
 def merge_two_ind(ind1, ind2, ev_ctx):
-    ind_new = []
-    taken = [False for _ in range(ev_ctx["n"])]
+    ind_new = set([])
 
     for idx in ind1:
-        ind_new.append(idx)
-        taken[idx] = True
-    
+        ind_new.add(idx)
+
     for idx in ind2:
-        if not taken[idx]:
-            ind_new.append(idx)
+        ind_new.add(idx)
+
     return ind_new
 
 def crossover(pop, ev_ctx):
@@ -92,13 +90,16 @@ def crossover(pop, ev_ctx):
         if random.random() < ev_ctx["CX_PROB"]:
             point_1 = len(p1)//2
             point_2 = len(p2)//2
-            #random.shuffle(p1)
-            #random.shuffle(p2)
-            p1.sort()
-            p2.sort()
+            
+            p1_list = sorted(list(p1))
+            p2_list = sorted(list(p2))
+            #p1_set = set(p1)
+            #p2_set = set(p2)
+            #union_set = p1_set & p2_set
+            #union_list = list(union_set)
 
-            o1 = merge_two_ind(p1[:point_1], p2[point_2:], ev_ctx)
-            o2 = merge_two_ind(p2[:point_2], p1[point_1:], ev_ctx)
+            o1 = merge_two_ind(p1_list[:point_1], p2_list[point_2:], ev_ctx)
+            o2 = merge_two_ind(p2_list[:point_2], p1_list[point_1:], ev_ctx)
             off.append(o1)
             off.append(o2)
         else:
@@ -143,7 +144,7 @@ def mutation_add_element(off, off_total_weight, ev_ctx):
                     continue
                 weight_plus = ev_ctx["list_price_weight"][idx][1] + off_total_weight[i]
                 if weight_plus <= ev_ctx["W"]:
-                    ind.append(idx)
+                    ind.add(idx)
                     off_total_weight[i] = weight_plus
                     nothing_added = False
     
@@ -164,11 +165,11 @@ def mutation_del_element(off, off_total_weight, ev_ctx):
         at_lest_once = True
 
         while at_lest_once or off_total_weight[i] > ev_ctx["W"]:
-            new_ind = []
+            new_ind = set([])
             at_lest_once = False
             for idx in ind:
                 if random.random() >= del_elem_prob:
-                    new_ind.append(idx)
+                    new_ind.add(idx)
                 else:
                     off_total_weight[i] -= ev_ctx["list_price_weight"][idx][1]
             ind = new_ind
@@ -205,6 +206,9 @@ def evolution(ev_ctx):
         
         #off[0] = max(pop, key=lambda x: fitness(x, ev_ctx))
         #pop = off[:]
+        pop.sort(key=lambda x: fitness(x, ev_ctx), reverse=True)
+        pop = pop[0:int(ev_ctx["POP_SIZE"]*ev_ctx["PERCT_OF_PARENTS_INTO_NEXT_POPULATION"])]
+        
         pop.extend(off)
         pop.sort(key=lambda x: fitness(x, ev_ctx), reverse=True)
         pop = pop[0:ev_ctx["POP_SIZE"]]
@@ -213,13 +217,14 @@ def evolution(ev_ctx):
 
 def evolutionary_algorithm(W, list_price_weight):
     ev_ctx = { # evolutionary context
-        "MAX_GEN": 1000,
-        "POP_SIZE": 50,
-        "CX_PROB": 0.8,
-        "MUT_DEL_PROB": 0.8,
+        "MAX_GEN": 100,
+        "POP_SIZE": 100,
+        "CX_PROB": 0.99,
+        "MUT_DEL_PROB": 0.99,
         "MUT_DEL_ELEMENT_PROB": lambda ind_size: 1/ind_size,
-        "MUT_ADD_PROB": 0.8,
+        "MUT_ADD_PROB": 0.99,
         "MUT_ADD_ELEMENT_PROB": lambda elements_to_add_size: 1/elements_to_add_size,
+        "PERCT_OF_PARENTS_INTO_NEXT_POPULATION": 0.05,
         "W": W,
         "list_price_weight": list_price_weight,
         "n": len(list_price_weight),
