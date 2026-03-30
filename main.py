@@ -107,41 +107,38 @@ def crossover(pop, ev_ctx):
             off.append(p2.copy())
     return off
 
-def mutation_add_element(off, off_total_weight, ev_ctx):
+def add_element_full(off, off_total_weight, ev_ctx):
     for i in range(len(off)):
         ind = off[i]
         ind_len = len(ind)
         if ind_len == ev_ctx["n"]:
             continue
-        if random.random() >= ev_ctx["MUT_ADD_PROB"]:
-            continue
-    
-        
+
         taken = [False for _ in range(ev_ctx["n"])]
+        taken_id_zip = list(zip(taken, list(range(ev_ctx["n"]))))
+        taken_id_zip = list(map(lambda x:list(x), taken_id_zip))
         elements_to_add_size = ev_ctx["n"]
         for idx in ind:
-            taken[idx] = True
+            taken_id_zip[idx][0] = True
             elements_to_add_size -= 1
 
         if elements_to_add_size == 0:
             continue
 
         
-        add_elem_prob = ev_ctx["MUT_ADD_ELEMENT_PROB"](elements_to_add_size)
-        at_lest_once = True
-        nothing_added = True
+        nothing_added = False
 
-        while at_lest_once or (off_total_weight[i] < ev_ctx["W"] and not nothing_added):
-            at_lest_once = False
+        while (off_total_weight[i] < ev_ctx["W"] and not nothing_added):
             nothing_added = True
 
-            for idx in range(ev_ctx["n"]):
-                if taken[idx]:
-                    continue
-                taken[idx] = True
+            random.shuffle(taken_id_zip)
 
-                if random.random() < add_elem_prob:
+            for j in range(ev_ctx["n"]):
+                if taken_id_zip[j][0]:
                     continue
+                taken_id_zip[j][0] = True
+                idx = taken_id_zip[j][1]
+
                 weight_plus = ev_ctx["list_price_weight"][idx][1] + off_total_weight[i]
                 if weight_plus <= ev_ctx["W"]:
                     ind.add(idx)
@@ -188,7 +185,7 @@ def mutation(off, ev_ctx):
         off_total_weight.append(total_ind_weight)
 
     off = mutation_del_element(off, off_total_weight, ev_ctx)
-    off = mutation_add_element(off, off_total_weight, ev_ctx)
+    off = add_element_full(off, off_total_weight, ev_ctx)
 
     return off
 
