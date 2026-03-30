@@ -69,7 +69,9 @@ def roulette_wheel_select(pop, fits, ev_ctx):
     return random.choices(pop, weights=fits, k=ev_ctx["POP_SIZE"])
 
 def select(pop, fits, ev_ctx):
-    return tournament_select(pop, fits, ev_ctx)
+    if ev_ctx["TOURNAMENT_SELECTION"] == None:
+        return roulette_wheel_select(pop, fits, ev_ctx)
+    return tournament_select(pop, fits, ev_ctx, ev_ctx["TOURNAMENT_SELECTION"])
 
 def deep_copy_population(pop):
     off = []
@@ -229,17 +231,18 @@ def evolutionary_algorithm(W, list_price_weight):
         return 1/ind_size
 
     ev_ctx = { # evolutionary context
-        "MAX_GEN": 400,
-        "POP_SIZE": 60,
-        "CX_PROB": 0.90,
-        "MUT_DEL_PROB": 0.95,
+        "MAX_GEN": 50,
+        "POP_SIZE": 20,
+        "CX_PROB": 0.50,
+        "MUT_DEL_PROB": 0.50,
         "MUT_DEL_ELEMENT_PROB": mut_del_elem_prob_func,
         "PERCT_OF_PARENTS_INTO_NEXT_POPULATION": 0.1,
         "W": W,
         "list_price_weight": list_price_weight,
         "n": len(list_price_weight),
         "IS_FLAT_WINDOW": 10,
-        "current_variable_is_function_flat": False
+        "current_variable_is_function_flat": False,
+        "TOURNAMENT_SELECTION": 3 # If set to None -> roulete selection
     }
 
 
