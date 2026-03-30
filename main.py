@@ -99,10 +99,6 @@ def crossover(pop, ev_ctx):
             
             p1_list = sorted(list(p1))
             p2_list = sorted(list(p2))
-            #p1_set = set(p1)
-            #p2_set = set(p2)
-            #union_set = p1_set & p2_set
-            #union_list = list(union_set)
 
             o1 = merge_two_ind(p1_list[:point_1], p2_list[point_2:], ev_ctx)
             o2 = merge_two_ind(p2_list[:point_2], p1_list[point_1:], ev_ctx)
@@ -131,12 +127,10 @@ def add_element_full(off, off_total_weight, ev_ctx):
         if elements_to_add_size == 0:
             continue
 
-        
         nothing_added = False
 
         while (off_total_weight[i] < ev_ctx["W"] and not nothing_added):
             nothing_added = True
-
             random.shuffle(taken_id_zip)
 
             for j in range(ev_ctx["n"]):
