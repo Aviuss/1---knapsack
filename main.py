@@ -221,22 +221,24 @@ def evolutionary_algorithm(W, list_price_weight):
     
     def mut_del_elem_prob_func(ind_size, ev_ctx):
         if ev_ctx['current_variable_is_function_flat']:
-            return 7/ind_size
+            if random.random() < 0.1:
+                return 50/ind_size
+            return 3/ind_size
         return 1/ind_size
 
     ev_ctx = { # evolutionary context
-        "MAX_GEN": 50,
-        "POP_SIZE": 20,
-        "CX_PROB": 0.50,
-        "MUT_DEL_PROB": 0.50,
+        "MAX_GEN": 400,
+        "POP_SIZE": 100,
+        "CX_PROB": 0.95,
+        "MUT_DEL_PROB": 0.95,
         "MUT_DEL_ELEMENT_PROB": mut_del_elem_prob_func,
-        "PERCT_OF_PARENTS_INTO_NEXT_POPULATION": 0.1,
+        "PERCT_OF_PARENTS_INTO_NEXT_POPULATION": 0.07,
         "W": W,
         "list_price_weight": list_price_weight,
         "n": len(list_price_weight),
         "IS_FLAT_WINDOW": 10,
         "current_variable_is_function_flat": False,
-        "TOURNAMENT_SELECTION": 3 # If set to None -> roulete selection
+        "TOURNAMENT_SELECTION": 4 # If set to None -> roulete selection
     }
 
 
@@ -256,14 +258,13 @@ def evolutionary_algorithm(W, list_price_weight):
 
     legend_elements = [
         Line2D([0], [0], color='steelblue', label='evolving'),
-        Line2D([0], [0], color='red',       label='flat (stagnant)'),
+        Line2D([0], [0], color='red', label='flat (stagnant)'),
     ]
     ax.legend(handles=legend_elements)
     ax.set_xlabel('Generation')
     ax.set_ylabel('Max fitness')
     plt.tight_layout()
     plt.show()
-
 
 def main(args):
     knapsack_data = read_data_from_file(args.file)
@@ -275,8 +276,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    #random.seed(2137)
     parser = argparse.ArgumentParser()
     parser.add_argument("--file", default="test_data/input_1000.txt", type=str, help="Test data to load.")
-
+    
     main(parser.parse_args())
